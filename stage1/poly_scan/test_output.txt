@@ -1,0 +1,75 @@
+   Compiling poly_scan v0.1.0 (/Users/yangjunan/Documents/blockchain/OGBC-Intern-Project/stage1/poly_scan)
+warning: unused import: `super::*`
+ --> src/scanner_test.rs:4:9
+  |
+4 |     use super::*;
+  |         ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/scanner.rs:198:14
+    |
+198 |          let mut resolved_ids: HashMap<U256, Address> = HashMap::new(); // Map ID -> Real Token Address
+    |              ----^^^^^^^^^^^^
+    |              |
+    |              help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `resolved_ids`
+   --> src/scanner.rs:198:14
+    |
+198 |          let mut resolved_ids: HashMap<U256, Address> = HashMap::new(); // Map ID -> Real Token Address
+    |              ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_resolved_ids`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `NATIVE_TOKEN_DECIMALS` is never used
+ --> src/consts.rs:9:11
+  |
+9 | pub const NATIVE_TOKEN_DECIMALS: u32 = 18;
+  |           ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `OrderFilledLog` is never constructed
+ --> src/models.rs:5:12
+  |
+5 | pub struct OrderFilledLog {
+  |            ^^^^^^^^^^^^^^
+
+warning: variant `UNKNOWN` is never constructed
+  --> src/models.rs:24:5
+   |
+21 | pub enum TradeSide {
+   |          --------- variant in this enum
+...
+24 |     UNKNOWN,
+   |     ^^^^^^^
+   |
+   = note: `TradeSide` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: `poly_scan` (bin "poly_scan" test) generated 6 warnings (run `cargo fix --bin "poly_scan" -p poly_scan --tests` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.01s
+     Running unittests src/main.rs (target/debug/deps/poly_scan-bc2399f4b55e917a)
+
+running 1 test
+test scanner::scanner_test::tests::test_decode_specific_condition_id ... FAILED
+
+failures:
+
+---- scanner::scanner_test::tests::test_decode_specific_condition_id stdout ----
+Scanning for Condition ID: 0xe3b423dfad8c22ff75c9899c4e8176f628cf4ad4caa00481764d320e7415f7a9
+
+thread 'scanner::scanner_test::tests::test_decode_specific_condition_id' (2618313) panicked at src/scanner_test.rs:29:23:
+Error: (code: -32062, message: Block range is too large, data: None)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    scanner::scanner_test::tests::test_decode_specific_condition_id
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+
+error: test failed, to rerun pass `--bin poly_scan`

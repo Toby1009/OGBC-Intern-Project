@@ -1,23 +1,8 @@
-use ethers::types::{Address, H256, U256};
 use serde::Serialize;
 
-#[derive(Debug, Clone)]
-pub struct OrderFilledLog {
-    pub order_hash: H256,
-    pub maker: Address,
-    pub taker: Address,
-    pub maker_asset_id: U256,
-    pub taker_asset_id: U256,
-    pub maker_amount_filled: U256,
-    pub taker_amount_filled: U256,
-    pub fee: U256,
-    // Metadata
-    pub tx_hash: H256,
-    pub log_index: U256,
-    pub block_number: u64,
-}
 
 #[derive(Serialize, Debug)]
+#[allow(dead_code)]
 pub enum TradeSide {
     BUY,
     SELL,
@@ -41,4 +26,16 @@ pub struct TradeOutput {
     pub price: String,
     pub token_id: String,
     pub side: TradeSide,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketInfo {
+    pub condition_id: String,
+    pub question_id: String,
+    pub oracle: String,
+    pub outcome_slot_count: u64,
+    pub collateral_token: String,
+    pub yes_token_id: String,
+    pub no_token_id: String,
 }

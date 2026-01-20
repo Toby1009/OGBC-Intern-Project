@@ -1,8 +1,9 @@
 use crate::consts::*;
-use crate::models::{TradeOutput, TradeSide};
-use crate::utils::{calculate_price, format_address, u256_to_string};
+use crate::models::{TradeOutput, TradeSide, MarketInfo};
+use crate::utils::{calculate_price, format_address, u256_to_string, get_condition_id, get_collection_id, get_position_id};
 use anyhow::Result;
 use ethers::prelude::*;
+use ethers::utils::keccak256;
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -42,6 +43,156 @@ impl Scanner {
             .collect();
             
         self.process_logs(logs).await
+    }
+
+    pub async fn fetch_market_info(&self, tx_hash: H256) -> Result<Option<MarketInfo>> {
+        let receipt = self.provider.get_transaction_receipt(tx_hash).await?
+            .ok_or_else(|| anyhow::anyhow!("Transaction receipt not found"))?;
+
+        let event_sig = H256::from(keccak256(CONDITION_PREPARATION_EVENT_SIGNATURE));
+
+        for log in receipt.logs {
+            if log.topics.get(0) == Some(&event_sig) {
+                if log.topics.len() < 4 { continue; }
+
+                let condition_id_log = log.topics[1];
+                let oracle_h256 = log.topics[2]; 
+                let question_id = log.topics[3];
+                let outcome_slot_count = U256::from_big_endian(&log.data);
+
+                let oracle_addr = Address::from_slice(&oracle_h256.as_bytes()[12..32]);
+                let calculated_condition_id = get_condition_id(oracle_addr, question_id, outcome_slot_count);
+
+                // Note: USDC is used as collateral
+                let collateral_token = Address::from_str(USDC_ADDRESS)?;
+
+                // Collection IDs
+                let parent_collection_id = H256::zero();
+                let collection_id_yes = get_collection_id(parent_collection_id, calculated_condition_id, U256::from(1));
+                let collection_id_no = get_collection_id(parent_collection_id, calculated_condition_id, U256::from(2));
+
+                // Position IDs (Token IDs)
+                let yes_token_id = get_position_id(collateral_token, collection_id_yes);
+                let no_token_id = get_position_id(collateral_token, collection_id_no);
+
+                return Ok(Some(MarketInfo {
+                    condition_id: format!("{:?}", condition_id_log),
+                    question_id: format!("{:?}", question_id),
+                    oracle: format_address(oracle_addr),
+                    outcome_slot_count: outcome_slot_count.as_u64(),
+                    collateral_token: format_address(collateral_token),
+                    yes_token_id: format!("0x{:x}", yes_token_id),
+                    no_token_id: format!("0x{:x}", no_token_id),
+                }));
+            }
+        }
+        
+        Ok(None)
+    }
+
+    pub async fn fetch_market_info_by_condition_id(&self, condition_id: H256, from_block: Option<u64>) -> Result<Option<MarketInfo>> {
+        // We will scan for logs with Topic1 = conditionId
+        // CTF Contract Address
+        let ctf_address = Address::from_str(CTF_ADDRESS)?;
+        let start = from_block.unwrap_or(0);
+
+        let filter = Filter::new()
+            .address(ctf_address)
+            .event(CONDITION_PREPARATION_EVENT_SIGNATURE)
+            .topic1(condition_id)
+            .from_block(start); // CLI should provide a reasonable start or 0 if risky
+            // .to_block(BlockNumber::Latest); // Implicit
+
+        let logs = self.provider.get_logs(&filter).await?;
+
+        if let Some(log) = logs.first() {
+            // Found the log!
+            // Logic is very similar to fetch_market_info, but extracting logic
+            
+            let condition_id_log = log.topics[1]; // Should match input
+            let oracle_h256 = log.topics[2]; 
+            let question_id = log.topics[3];
+            let outcome_slot_count = U256::from_big_endian(&log.data);
+
+            let oracle_addr = Address::from_slice(&oracle_h256.as_bytes()[12..32]);
+            // Re-verify calculation just in case
+            let calculated_condition_id = get_condition_id(oracle_addr, question_id, outcome_slot_count);
+
+            if calculated_condition_id != condition_id {
+                 // Should technically not happen if topic match worked and logic holds, but sanity check
+                 eprintln!("Warning: Calculated condition ID mismatch.");
+            }
+
+            // Note: USDC is used as collateral
+            let collateral_token = Address::from_str(USDC_ADDRESS)?;
+
+            // Collection IDs
+            let parent_collection_id = H256::zero();
+            let collection_id_yes = get_collection_id(parent_collection_id, calculated_condition_id, U256::from(1));
+            let collection_id_no = get_collection_id(parent_collection_id, calculated_condition_id, U256::from(2));
+
+            // Position IDs (Token IDs)
+            let yes_token_id = get_position_id(collateral_token, collection_id_yes);
+            let no_token_id = get_position_id(collateral_token, collection_id_no);
+
+            return Ok(Some(MarketInfo {
+                condition_id: format!("{:?}", condition_id_log),
+                question_id: format!("{:?}", question_id),
+                oracle: format_address(oracle_addr),
+                outcome_slot_count: outcome_slot_count.as_u64(),
+                collateral_token: format_address(collateral_token),
+                yes_token_id: format!("0x{:x}", yes_token_id),
+                no_token_id: format!("0x{:x}", no_token_id),
+            }));
+        }
+
+        Ok(None)
+    }
+
+    pub async fn fetch_market_events(&self, from_block: u64, to_block: u64) -> Result<Vec<MarketInfo>> {
+        let ctf_address = Address::from_str(CTF_ADDRESS)?;
+        
+        let filter = Filter::new()
+            .address(ctf_address)
+            .event(CONDITION_PREPARATION_EVENT_SIGNATURE)
+            .from_block(from_block)
+            .to_block(to_block);
+
+        let logs = self.provider.get_logs(&filter).await?;
+        let mut markets = Vec::new();
+
+        for log in logs {
+            if log.topics.len() < 4 { continue; }
+            
+            let condition_id_log = log.topics[1]; 
+            let oracle_h256 = log.topics[2]; 
+            let question_id = log.topics[3];
+            let outcome_slot_count = U256::from_big_endian(&log.data);
+
+            let oracle_addr = Address::from_slice(&oracle_h256.as_bytes()[12..32]);
+            let calculated_condition_id = get_condition_id(oracle_addr, question_id, outcome_slot_count);
+
+            let collateral_token = Address::from_str(USDC_ADDRESS)?;
+
+            let parent_collection_id = H256::zero();
+            let collection_id_yes = get_collection_id(parent_collection_id, calculated_condition_id, U256::from(1));
+            let collection_id_no = get_collection_id(parent_collection_id, calculated_condition_id, U256::from(2));
+
+            let yes_token_id = get_position_id(collateral_token, collection_id_yes);
+            let no_token_id = get_position_id(collateral_token, collection_id_no);
+
+            markets.push(MarketInfo {
+                condition_id: format!("{:?}", condition_id_log),
+                question_id: format!("{:?}", question_id),
+                oracle: format_address(oracle_addr),
+                outcome_slot_count: outcome_slot_count.as_u64(),
+                collateral_token: format_address(collateral_token),
+                yes_token_id: format!("0x{:x}", yes_token_id),
+                no_token_id: format!("0x{:x}", no_token_id),
+            });
+        }
+        
+        Ok(markets)
     }
 
     async fn process_logs(&self, logs: Vec<Log>) -> Result<Vec<TradeOutput>> {
@@ -91,7 +242,6 @@ impl Scanner {
 
          // 2. Try to fetch decimals for simple Address-like IDs
          let mut decimals_map: HashMap<Address, u32> = HashMap::new();
-         let mut resolved_ids: HashMap<U256, Address> = HashMap::new(); // Map ID -> Real Token Address
          
          for addr in potential_tokens {
              if let Some(dec) = self.get_decimals(addr).await {
@@ -294,3 +444,7 @@ impl Scanner {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "scanner_test.rs"]
+mod scanner_test;

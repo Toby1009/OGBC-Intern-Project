@@ -1,5 +1,6 @@
-use ethers::types::{U256, Address};
-use ethers::utils::format_units;
+use ethers::types::{U256, Address, H256};
+use ethers::utils::{format_units, keccak256};
+use ethers::abi::{encode, Token};
 
 pub fn format_address(addr: Address) -> String {
     format!("{:?}", addr)
@@ -42,4 +43,41 @@ pub fn format_token_amount(amount: f64) -> String {
     } else {
         format!("{:.4}", amount)
     }
+}
+
+pub fn get_condition_id(
+    oracle: Address,
+    question_id: H256,
+    outcome_slot_count: U256,
+) -> H256 {
+    let encoded = encode(&[
+        Token::Address(oracle),
+        Token::FixedBytes(question_id.as_bytes().to_vec()),
+        Token::Uint(outcome_slot_count),
+    ]);
+    H256::from(keccak256(&encoded))
+}
+
+pub fn get_collection_id(
+    parent_collection_id: H256,
+    condition_id: H256,
+    index_set: U256,
+) -> H256 {
+    let encoded = encode(&[
+        Token::FixedBytes(parent_collection_id.as_bytes().to_vec()),
+        Token::FixedBytes(condition_id.as_bytes().to_vec()),
+        Token::Uint(index_set),
+    ]);
+    H256::from(keccak256(&encoded))
+}
+
+pub fn get_position_id(
+    collateral_token: Address,
+    collection_id: H256,
+) -> H256 {
+    let encoded = encode(&[
+        Token::Address(collateral_token),
+        Token::Uint(U256::from_big_endian(collection_id.as_bytes())),
+    ]);
+    H256::from(keccak256(&encoded))
 }
