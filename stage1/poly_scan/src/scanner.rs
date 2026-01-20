@@ -307,8 +307,8 @@ impl Scanner {
          // 5. Final Pass: Parse
          let mut trades = Vec::new();
          for trade in raw_trades {
-             let mut maker_decimals = 18;
-             let mut taker_decimals = 18;
+             let mut maker_decimals = 6; // Polymarket uses 6 decimals for all tokens
+             let mut taker_decimals = 6;
              
              // Resolve Maker Decimals
              if trade.maker_asset_id == U256::zero() {
