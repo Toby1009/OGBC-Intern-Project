@@ -59,26 +59,27 @@ async fn main() -> Result<()> {
         let condition_id_hash = H256::from_str(&cond_id).expect("Invalid Condition ID");
         let slot_count = 2; // Default to 2 for CLI manual mode
 
-        // Verification
+        // Verification (optional - just for information)
         let calculated_condition_id = utils::get_condition_id(oracle_addr, question_id, U256::from(slot_count));
         
         if calculated_condition_id != condition_id_hash {
              println!("{} Calculated: {:?}, Input: {:?}", "⚠️ Warning: Calculated Condition ID does not match input!".red().bold(), calculated_condition_id, condition_id_hash);
+             println!("{}", "Using your provided Condition ID...".yellow());
         } else {
              println!("{}", "✅ Condition ID Verified!".green());
         }
 
-        // Calculate everything else
+        // Use the user-provided condition ID (not the calculated one)
         let collateral_token_addr = Address::from_str(crate::consts::USDC_ADDRESS).unwrap();
         let parent_collection_id = H256::zero();
-        let collection_id_yes = utils::get_collection_id(parent_collection_id, calculated_condition_id, U256::from(1));
-        let collection_id_no = utils::get_collection_id(parent_collection_id, calculated_condition_id, U256::from(2));
+        let collection_id_yes = utils::get_collection_id(parent_collection_id, condition_id_hash, U256::from(1));
+        let collection_id_no = utils::get_collection_id(parent_collection_id, condition_id_hash, U256::from(2));
 
         let yes_token_id = utils::get_position_id(collateral_token_addr, collection_id_yes);
         let no_token_id = utils::get_position_id(collateral_token_addr, collection_id_no);
 
         let info = models::MarketInfo {
-             condition_id: format!("{:?}", calculated_condition_id),
+             condition_id: format!("{:?}", condition_id_hash),
              question_id: format!("{:?}", question_id),
              oracle: utils::format_address(oracle_addr),
              outcome_slot_count: slot_count,
@@ -252,26 +253,27 @@ async fn run_interactive_mode(scanner: &Scanner) -> Result<()> {
                                     .interact_text()?;
 
                                  if let (Ok(oracle_addr), Ok(question_id)) = (Address::from_str(oracle_str.trim()), H256::from_str(question_id_str.trim())) {
-                                     // Verification
+                                     // Verification (optional - just for information)
                                      let calculated_condition_id = utils::get_condition_id(oracle_addr, question_id, U256::from(slot_count));
                                      
                                      if calculated_condition_id != hash {
                                          println!("{} Calculated: {:?}, Input: {:?}", "⚠️ Warning: Calculated Condition ID does not match input!".red().bold(), calculated_condition_id, hash);
+                                         println!("{}", "Using your provided Condition ID...".yellow());
                                      } else {
                                          println!("{}", "✅ Condition ID Verified!".green());
                                      }
 
-                                     // Calculate everything else
+                                     // Use the user-provided condition ID (not the calculated one)
                                      let collateral_token_addr = Address::from_str(crate::consts::USDC_ADDRESS).unwrap();
                                      let parent_collection_id = H256::zero();
-                                     let collection_id_yes = utils::get_collection_id(parent_collection_id, calculated_condition_id, U256::from(1));
-                                     let collection_id_no = utils::get_collection_id(parent_collection_id, calculated_condition_id, U256::from(2));
+                                     let collection_id_yes = utils::get_collection_id(parent_collection_id, hash, U256::from(1));
+                                     let collection_id_no = utils::get_collection_id(parent_collection_id, hash, U256::from(2));
 
                                      let yes_token_id = utils::get_position_id(collateral_token_addr, collection_id_yes);
                                      let no_token_id = utils::get_position_id(collateral_token_addr, collection_id_no);
 
                                      let info = models::MarketInfo {
-                                         condition_id: format!("{:?}", calculated_condition_id),
+                                         condition_id: format!("{:?}", hash),
                                          question_id: format!("{:?}", question_id),
                                          oracle: utils::format_address(oracle_addr),
                                          outcome_slot_count: slot_count,
